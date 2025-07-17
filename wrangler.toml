@@ -1,0 +1,5 @@
+# wrangler.toml
+name = "friend-rss-aggregator"
+main = "worker.js"
+compatibility_date = "2025-07-17"
+node_compat = true
