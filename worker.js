@@ -8,21 +8,19 @@ import 'string_decoder';
 import 'timers';
 
 // 从环境变量获取配置
-const getConfig = (env) => {
-  console.log("获取环境变量配置:", Object.keys(env));
   
-  if (!env.FRIENDS_YAML_URL) {
+  if (FRIENDS_YAML_URL) {
     const errorMsg = `FRIENDS_YAML_URL 环境变量未配置。当前环境变量: ${JSON.stringify(env)}`;
     console.error(errorMsg);
     throw new Error(errorMsg);
   }
   
   return {
-    friendsYamlUrl: env.FRIENDS_YAML_URL,
-    cacheTTL: env.CACHE_TTL ? parseInt(env.CACHE_TTL) : 600,
-    limit: env.MAX_ENTRIES ? parseInt(env.MAX_ENTRIES) : 50,
-    daysLimit: env.DAYS_LIMIT ? parseInt(env.DAYS_LIMIT) : 30,
-    timeout: env.REQUEST_TIMEOUT ? parseInt(env.REQUEST_TIMEOUT) : 10000,
+    friendsYamlUrl: FRIENDS_YAML_URL,
+    cacheTTL: CACHE_TTL ? parseInt(CACHE_TTL) : 600,
+    limit: MAX_ENTRIES ? parseInt(MAX_ENTRIES) : 50,
+    daysLimit: DAYS_LIMIT ? parseInt(DAYS_LIMIT) : 30,
+    timeout: REQUEST_TIMEOUT ? parseInt(REQUEST_TIMEOUT) : 10000,
   };
 };
 
