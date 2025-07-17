@@ -22,7 +22,6 @@ import 'timers';
     daysLimit: DAYS_LIMIT ? parseInt(DAYS_LIMIT) : 30,
     timeout: REQUEST_TIMEOUT ? parseInt(REQUEST_TIMEOUT) : 10000,
   };
-};
 
 // 定义Worker对象
 const worker = {
