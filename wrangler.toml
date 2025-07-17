@@ -1,6 +1,5 @@
 name = "friend-rss-aggregator"
 main = "worker.js"
 compatibility_date = "2025-07-17"
-
-# 替换 node_compat = true 为
 compatibility_flags = ["nodejs_compat"]
+format = "modules"

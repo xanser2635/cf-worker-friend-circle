@@ -1,38 +1,57 @@
-// 引入必要的库
 import { parse } from 'yaml';
 import { parseString } from 'xml2js';
 
+import 'node:events';
+import 'node:perf_hooks';
+import 'node:stream';
+import 'node:tty';
+import 'string_decoder';
+import 'timers';
+
 // 从环境变量获取配置
 const getConfig = (env) => {
-  // YAML文件链接是必需的
   if (!env.FRIENDS_YAML_URL) {
     throw new Error('FRIENDS_YAML_URL 环境变量未配置');
   }
   
   return {
-    // 友链数据YAML的URL (必需)
     friendsYamlUrl: env.FRIENDS_YAML_URL,
-    // 缓存时间（秒）默认10分钟
     cacheTTL: env.CACHE_TTL ? parseInt(env.CACHE_TTL) : 600,
-    // 最大文章数量 默认50条
     limit: env.MAX_ENTRIES ? parseInt(env.MAX_ENTRIES) : 50,
-    // 只展示多少天内的文章 默认30天
     daysLimit: env.DAYS_LIMIT ? parseInt(env.DAYS_LIMIT) : 30,
-    // 请求超时时间（毫秒）默认10秒
     timeout: env.REQUEST_TIMEOUT ? parseInt(env.REQUEST_TIMEOUT) : 10000,
   };
 };
 
-addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event));
-});
+// 默认导出模块格式Worker
+export default {
+  async fetch(request, env, ctx) {
+    try {
+      // 构建模拟event对象
+      const event = {
+        request,
+        env,
+        ctx
+      };
+      
+      return await handleRequest(event);
+    } catch (error) {
+      return new Response(JSON.stringify({ 
+        error: 'Worker初始化失败', 
+        message: error.message 
+      }), { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+};
 
 async function handleRequest(event) {
   try {
-    // 获取环境变量配置
     const config = getConfig(event.env);
     
-    // 尝试从缓存获取
+    // 使用标准请求对象处理缓存
     const cache = caches.default;
     const cachedResponse = await cache.match(event.request);
     if (cachedResponse) {
@@ -56,12 +75,12 @@ async function handleRequest(event) {
       }
     });
     
-    // 缓存响应
-    event.waitUntil(cache.put(event.request, response.clone()));
+    // 使用ctx.waitUntil处理后台任务
+    event.ctx.waitUntil(cache.put(event.request.clone(), response.clone()));
     return response;
   } catch (error) {
     return new Response(JSON.stringify({ 
-      error: '处理失败', 
+      error: '请求处理失败', 
       message: error.message 
     }), { 
       status: 500,
@@ -118,7 +137,7 @@ async function fetchFeed(url, name, site, config) {
     }
     
     const xml = await response.text();
-    return parseFeed(xml, name, site, config);
+    return await parseFeed(xml, name, site, config);
   } catch (error) {
     console.error(`获取RSS失败: ${url}`, error);
     return [];
@@ -129,7 +148,8 @@ function parseFeed(xml, name, site, config) {
   return new Promise((resolve, reject) => {
     parseString(xml, (err, result) => {
       if (err) {
-        reject(new Error('XML解析失败'));
+        console.error('XML解析失败', err);
+        resolve([]);
         return;
       }
       
@@ -192,7 +212,8 @@ function parseFeed(xml, name, site, config) {
         
         resolve(entries);
       } catch (parseError) {
-        reject(parseError);
+        console.error('Feed解析异常', parseError);
+        resolve([]);
       }
     });
   });
