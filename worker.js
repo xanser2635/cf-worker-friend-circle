@@ -9,6 +9,11 @@ import 'string_decoder';
 import 'timers';
 
 // 从环境变量获取配置
+export default {
+  async fetch(request, env, ctx) {
+    // 添加调试输出
+    console.log("环境变量:", Object.keys(env));
+
 const getConfig = (env) => {
   if (!env.FRIENDS_YAML_URL) {
     throw new Error('FRIENDS_YAML_URL 环境变量未配置');
