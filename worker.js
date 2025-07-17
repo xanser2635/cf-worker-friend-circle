@@ -9,7 +9,7 @@ import 'timers';
 
 // 从环境变量获取配置
   
-  if (FRIENDS_YAML_URL) {
+  if (!FRIENDS_YAML_URL) {
     const errorMsg = `FRIENDS_YAML_URL 环境变量未配置。当前环境变量: ${JSON.stringify(env)}`;
     console.error(errorMsg);
     throw new Error(errorMsg);
@@ -73,9 +73,6 @@ const worker = {
     }
   }
 };
-
-// 导出Worker对象
-export default worker;
 
 // 辅助函数
 async function fetchFriendsData(config) {
