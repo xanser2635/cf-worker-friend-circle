@@ -209,3 +209,4 @@ function processEntries(entries, config) {
   
   // 限制返回数量
   return allEntries.slice(0, config.limit);
+}
