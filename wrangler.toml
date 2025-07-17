@@ -1,4 +1,4 @@
-name = "friend-rss-aggregator"
+name = "cf-worker-friend-circle"
 main = "worker.js"
 compatibility_date = "2025-07-17"
 compatibility_flags = ["nodejs_compat"]
