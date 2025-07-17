@@ -1,6 +1,5 @@
 import { parse } from 'yaml';
 import { parseString } from 'xml2js';
-
 import 'node:events';
 import 'node:perf_hooks';
 import 'node:stream';
@@ -9,14 +8,13 @@ import 'string_decoder';
 import 'timers';
 
 // 从环境变量获取配置
-export default {
-  async fetch(request, env, ctx) {
-    // 添加调试输出
-    console.log("环境变量:", Object.keys(env));
-
 const getConfig = (env) => {
+  console.log("获取环境变量配置:", Object.keys(env));
+  
   if (!env.FRIENDS_YAML_URL) {
-    throw new Error('FRIENDS_YAML_URL 环境变量未配置');
+    const errorMsg = `FRIENDS_YAML_URL 环境变量未配置。当前环境变量: ${JSON.stringify(env)}`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
   
   return {
@@ -28,23 +26,50 @@ const getConfig = (env) => {
   };
 };
 
-// 默认导出模块格式Worker
-export default {
+// 定义Worker对象
+const worker = {
   async fetch(request, env, ctx) {
     try {
-      // 构建模拟event对象
-      const event = {
-        request,
-        env,
-        ctx
+      console.log("请求处理开始，环境变量:", Object.keys(env));
+      
+      const config = getConfig(env);
+      const cache = caches.default;
+      const cachedResponse = await cache.match(request);
+      
+      if (cachedResponse) {
+        console.log("返回缓存响应");
+        return cachedResponse;
+      }
+
+      console.log("获取友链数据:", config.friendsYamlUrl);
+      const friendsData = await fetchFriendsData(config);
+      
+      console.log("获取RSS feed");
+      const feedEntries = await fetchAllFeeds(friendsData, config);
+      
+      console.log("处理数据");
+      const processedData = processEntries(feedEntries, config);
+      
+      const response = new Response(JSON.stringify(processedData), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': `public, max-age=${config.cacheTTL}`
+        }
+      });
+      
+      ctx.waitUntil(cache.put(request.clone(), response.clone()));
+      console.log("请求处理成功");
+      return response;
+    } catch (error) {
+      const errorDetails = {
+        error: '请求处理失败',
+        message: error.message,
+        envKeys: Object.keys(env),
+        stack: error.stack
       };
       
-      return await handleRequest(event);
-    } catch (error) {
-      return new Response(JSON.stringify({ 
-        error: 'Worker初始化失败', 
-        message: error.message 
-      }), { 
+      console.error("请求处理错误:", errorDetails);
+      return new Response(JSON.stringify(errorDetails), { 
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
@@ -52,52 +77,14 @@ export default {
   }
 };
 
-async function handleRequest(event) {
-  try {
-    const config = getConfig(event.env);
-    
-    // 使用标准请求对象处理缓存
-    const cache = caches.default;
-    const cachedResponse = await cache.match(event.request);
-    if (cachedResponse) {
-      return cachedResponse;
-    }
+// 导出Worker对象
+export default worker;
 
-    // 获取友链数据
-    const friendsData = await fetchFriendsData(config);
-    
-    // 获取所有RSS feed
-    const feedEntries = await fetchAllFeeds(friendsData, config);
-    
-    // 处理数据
-    const processedData = processEntries(feedEntries, config);
-    
-    // 构建响应
-    const response = new Response(JSON.stringify(processedData), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': `public, max-age=${config.cacheTTL}`
-      }
-    });
-    
-    // 使用ctx.waitUntil处理后台任务
-    event.ctx.waitUntil(cache.put(event.request.clone(), response.clone()));
-    return response;
-  } catch (error) {
-    return new Response(JSON.stringify({ 
-      error: '请求处理失败', 
-      message: error.message 
-    }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}
-
+// 辅助函数
 async function fetchFriendsData(config) {
   const response = await fetch(config.friendsYamlUrl);
   if (!response.ok) {
-    throw new Error(`获取友链数据失败: ${response.status}`);
+    throw new Error(`获取友链数据失败: ${response.status} - ${response.statusText}`);
   }
   
   const yamlText = await response.text();
@@ -105,7 +92,6 @@ async function fetchFriendsData(config) {
 }
 
 async function fetchAllFeeds(friendsData, config) {
-  // 提取有效的feed URL
   const feedUrls = friendsData
     .filter(friend => friend.rss)
     .map(friend => ({
@@ -114,12 +100,12 @@ async function fetchAllFeeds(friendsData, config) {
       site: friend.site
     }));
   
-  // 并发请求所有feed
+  console.log(`找到 ${feedUrls.length} 个RSS源`);
+  
   const results = await Promise.allSettled(
     feedUrls.map(item => fetchFeed(item.url, item.name, item.site, config))
   );
   
-  // 合并成功的结果
   return results.flatMap(result => 
     result.status === 'fulfilled' ? result.value : []
   );
@@ -130,6 +116,7 @@ async function fetchFeed(url, name, site, config) {
   const timeoutId = setTimeout(() => controller.abort(), config.timeout);
   
   try {
+    console.log(`请求RSS源: ${url}`);
     const response = await fetch(url, {
       signal: controller.signal,
       headers: { 'User-Agent': 'Cloudflare-Worker' }
@@ -138,7 +125,7 @@ async function fetchFeed(url, name, site, config) {
     clearTimeout(timeoutId);
     
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(`HTTP错误: ${response.status} - ${response.statusText}`);
     }
     
     const xml = await response.text();
@@ -162,7 +149,6 @@ function parseFeed(xml, name, site, config) {
         const entries = [];
         const timeLimit = Date.now() - config.daysLimit * 86400000;
         
-        // 解析RSS格式
         if (result.rss && result.rss.channel) {
           const channel = result.rss.channel[0];
           const items = channel.item || [];
@@ -185,7 +171,6 @@ function parseFeed(xml, name, site, config) {
             }
           });
         } 
-        // 解析Atom格式
         else if (result.feed) {
           const feed = result.feed;
           const items = feed.entry || [];
@@ -215,6 +200,7 @@ function parseFeed(xml, name, site, config) {
           });
         }
         
+        console.log(`从 ${name} 解析 ${entries.length} 篇文章`);
         resolve(entries);
       } catch (parseError) {
         console.error('Feed解析异常', parseError);
@@ -225,14 +211,9 @@ function parseFeed(xml, name, site, config) {
 }
 
 function processEntries(entries, config) {
-  // 合并所有条目
   const allEntries = entries.flat();
-  
-  // 按日期排序（从新到旧）
   allEntries.sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
-  
-  // 限制返回数量
   return allEntries.slice(0, config.limit);
 }
