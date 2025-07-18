@@ -3,6 +3,5 @@ main = "worker.js"
 compatibility_date = "2025-07-17"
 compatibility_flags = ["nodejs_compat"]
 format = "modules"
-
 [observability.logs]
 enabled = true
