@@ -7,4 +7,4 @@ format = "modules"
 enabled = true
 
 [vars]
-FRIENDS_YAML_URL = ""
+FRIENDS_YAML_URL = "https://blog.xanz.one/data/friends.yaml"
