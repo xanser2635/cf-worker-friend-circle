@@ -7,12 +7,19 @@ import 'node:tty';
 import 'string_decoder';
 import 'timers';
 
-// 从环境变量获取配置
-  
+import { parse } from 'yaml';
+import { parseString } from 'xml2js';
+
+// 配置获取函数
+function getConfig(env) {
+  const FRIENDS_YAML_URL = env.FRIENDS_YAML_URL;
+  const CACHE_TTL = env.CACHE_TTL;
+  const MAX_ENTRIES = env.MAX_ENTRIES;
+  const DAYS_LIMIT = env.DAYS_LIMIT;
+  const REQUEST_TIMEOUT = env.REQUEST_TIMEOUT;
+
   if (!FRIENDS_YAML_URL) {
-    const errorMsg = `FRIENDS_YAML_URL 环境变量未配置。当前环境变量: ${JSON.stringify(env)}`;
-    console.error(errorMsg);
-    throw new Error(errorMsg);
+    throw new Error(`FRIENDS_YAML_URL 环境变量未配置`);
   }
   
   return {
@@ -22,6 +29,7 @@ import 'timers';
     daysLimit: DAYS_LIMIT ? parseInt(DAYS_LIMIT) : 30,
     timeout: REQUEST_TIMEOUT ? parseInt(REQUEST_TIMEOUT) : 10000,
   };
+}
 
 // 定义Worker对象
 const worker = {
