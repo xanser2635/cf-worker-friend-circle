@@ -9,6 +9,7 @@ function getConfig(env) {
   const MAX_ENTRIES = env.MAX_ENTRIES;
   const DAYS_LIMIT = env.DAYS_LIMIT;
   const REQUEST_TIMEOUT = env.REQUEST_TIMEOUT;
+  const SUMMARY_LIMIT = env.SUMMARY_LIMIT; // 新增摘要长度限制配置
 
   if (!FRIENDS_YAML_URL) {
     throw new Error(`FRIENDS_YAML_URL 环境变量未配置`);
@@ -20,6 +21,7 @@ function getConfig(env) {
     limit: MAX_ENTRIES ? parseInt(MAX_ENTRIES) : 50,
     daysLimit: DAYS_LIMIT ? parseInt(DAYS_LIMIT) : 30,
     timeout: REQUEST_TIMEOUT ? parseInt(REQUEST_TIMEOUT) : 10000,
+    summaryLimit: SUMMARY_LIMIT ? parseInt(SUMMARY_LIMIT) : 100 // 默认100个字符
   };
 }
 
@@ -39,12 +41,11 @@ async function fetchAllFeeds(friendsData, config) {
     .filter(friend => friend.feed)
     .map(friend => ({
       url: friend.feed,
-      name: friend.name,
-      site: friend.site
+      name: friend.name
     }));
   
   const results = await Promise.allSettled(
-    feedUrls.map(item => fetchFeed(item.url, item.name, item.site, config))
+    feedUrls.map(item => fetchFeed(item.url, item.name, config))
   );
   
   return results.flatMap(result => 
@@ -52,18 +53,21 @@ async function fetchAllFeeds(friendsData, config) {
   );
 }
 
-// 从URL提取根域名
-function extractBaseUrl(url) {
-  try {
-    const parsedUrl = new URL(url);
-    return `${parsedUrl.protocol}//${parsedUrl.host}/`;
-  } catch (e) {
-    return null;
-  }
+// 处理摘要截断
+function truncateSummary(summary, limit) {
+  if (!summary || limit <= 0) return null;
+  
+  // 移除HTML标签
+  const textOnly = summary.replace(/<[^>]*>?/gm, '');
+  
+  // 截断文本
+  if (textOnly.length <= limit) return textOnly;
+  
+  return textOnly.substring(0, limit) + '......';
 }
 
 // 获取单个RSS源
-async function fetchFeed(url, name, site, config) {
+async function fetchFeed(url, name, config) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), config.timeout);
   
@@ -80,7 +84,7 @@ async function fetchFeed(url, name, site, config) {
     }
     
     const xml = await response.text();
-    return await parseFeed(xml, name, site, config, url);
+    return await parseFeed(xml, name, config);
   } catch (error) {
     console.error(`获取RSS失败: ${url}`, error.message);
     return [];
@@ -119,7 +123,7 @@ function extractSummary(item) {
 }
 
 // 解析RSS源内容
-function parseFeed(xml, name, site, config, feedUrl) {
+function parseFeed(xml, name, config) {
   return new Promise((resolve) => {
     parseString(xml, (err, result) => {
       if (err) {
@@ -132,9 +136,6 @@ function parseFeed(xml, name, site, config, feedUrl) {
         const entries = [];
         const timeLimit = Date.now() - config.daysLimit * 86400000;
         
-        // 获取基础URL（优先从YAML配置中获取，其次从feed URL提取）
-        const baseUrl = site || extractBaseUrl(feedUrl) || extractBaseUrl(feedUrl);
-        
         // 处理RSS 2.0格式
         if (result.rss?.channel) {
           const channel = result.rss.channel[0];
@@ -143,15 +144,16 @@ function parseFeed(xml, name, site, config, feedUrl) {
             const entryDate = pubDate ? new Date(pubDate) : new Date();
             
             if (entryDate.getTime() > timeLimit) {
+              const rawSummary = extractSummary(item);
+              const summary = truncateSummary(rawSummary, config.summaryLimit);
+              
               entries.push({
                 title: item.title?.[0]?.trim() || '无标题',
                 link: item.link?.[0]?.trim() || '#',
                 date: entryDate.toISOString(),
-                summary: extractSummary(item),
+                summary: summary,
                 source: {
-                  name,
-                  site: baseUrl, // 使用基础URL
-                  url: baseUrl   // 使用基础URL而不是具体页面
+                  name: name // 只保留name字段
                 }
               });
             }
@@ -169,15 +171,16 @@ function parseFeed(xml, name, site, config, feedUrl) {
                            item.link?.[0]?.$.href || 
                            '#';
               
+              const rawSummary = extractSummary(item);
+              const summary = truncateSummary(rawSummary, config.summaryLimit);
+              
               entries.push({
                 title: item.title?.[0]?._?.trim() || item.title?.[0]?.trim() || '无标题',
                 link,
                 date: entryDate.toISOString(),
-                summary: extractSummary(item),
+                summary: summary,
                 source: {
-                  name,
-                  site: baseUrl, // 使用基础URL
-                  url: baseUrl   // 使用基础URL而不是具体页面
+                  name: name // 只保留name字段
                 }
               });
             }
