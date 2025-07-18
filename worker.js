@@ -7,9 +7,6 @@ import 'node:tty';
 import 'string_decoder';
 import 'timers';
 
-import { parse } from 'yaml';
-import { parseString } from 'xml2js';
-
 // 配置获取函数
 function getConfig(env) {
   const FRIENDS_YAML_URL = env.FRIENDS_YAML_URL;
