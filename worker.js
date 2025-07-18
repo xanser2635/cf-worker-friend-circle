@@ -35,11 +35,11 @@ async function fetchFriendsData(config) {
 
 // 获取所有RSS源数据
 async function fetchAllFeeds(friendsData, config) {
-
+  // 修改点: 使用 feed 字段替代 rss
   const feedUrls = friendsData
-    .filter(friend => friend.feed)
+    .filter(friend => friend.feed) // 改为检查 feed 字段
     .map(friend => ({
-      url: friend.feed,
+      url: friend.feed, // 改为使用 feed 字段
       name: friend.name,
       site: friend.site
     }));
@@ -160,38 +160,64 @@ function processEntries(entries, config) {
   return allEntries.slice(0, config.limit);
 }
 
+// 处理OPTIONS请求 (预检请求)
+function handleOptions() {
+  return new Response(null, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400', // 24小时
+    }
+  });
+}
+
 // 使用ES模块格式导出Worker
 export default {
   async fetch(request, env, ctx) {
     try {
+      // 处理OPTIONS请求 (CORS预检)
+      if (request.method === 'OPTIONS') {
+        return handleOptions();
+      }
+
       const config = getConfig(env);
       const cache = caches.default;
       const cachedResponse = await cache.match(request);
       
       if (cachedResponse) {
-        return cachedResponse;
+        // 缓存命中也要添加CORS头部
+        const response = new Response(cachedResponse.body, cachedResponse);
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        return response;
       }
 
       const friendsData = await fetchFriendsData(config);
       const feedEntries = await fetchAllFeeds(friendsData, config);
       const processedData = processEntries(feedEntries, config);
       
+      // 创建响应并添加CORS头部
       const response = new Response(JSON.stringify(processedData), {
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': `public, max-age=${config.cacheTTL}`
+          'Cache-Control': `public, max-age=${config.cacheTTL}`,
+          'Access-Control-Allow-Origin': '*' // 允许所有域名访问
         }
       });
       
       ctx.waitUntil(cache.put(request.clone(), response.clone()));
       return response;
     } catch (error) {
+      // 错误响应也要添加CORS头部
       return new Response(JSON.stringify({
         error: '请求处理失败',
         message: error.message
       }), { 
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
       });
     }
   }
