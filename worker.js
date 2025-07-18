@@ -1,5 +1,6 @@
 import { parse } from 'yaml';
 import { parseString } from 'xml2js';
+import { env } from "cloudflare:workers";
 
 // 配置获取函数
 function getConfig(env) {
@@ -34,10 +35,11 @@ async function fetchFriendsData(config) {
 
 // 获取所有RSS源数据
 async function fetchAllFeeds(friendsData, config) {
+
   const feedUrls = friendsData
-    .filter(friend => friend.rss)
+    .filter(friend => friend.feed)
     .map(friend => ({
-      url: friend.rss,
+      url: friend.feed,
       name: friend.name,
       site: friend.site
     }));
