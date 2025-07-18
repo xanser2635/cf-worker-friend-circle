@@ -52,6 +52,16 @@ async function fetchAllFeeds(friendsData, config) {
   );
 }
 
+// 从URL提取根域名
+function extractBaseUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+    return `${parsedUrl.protocol}//${parsedUrl.host}/`;
+  } catch (e) {
+    return null;
+  }
+}
+
 // 获取单个RSS源
 async function fetchFeed(url, name, site, config) {
   const controller = new AbortController();
@@ -70,7 +80,7 @@ async function fetchFeed(url, name, site, config) {
     }
     
     const xml = await response.text();
-    return await parseFeed(xml, name, site, config);
+    return await parseFeed(xml, name, site, config, url);
   } catch (error) {
     console.error(`获取RSS失败: ${url}`, error.message);
     return [];
@@ -109,7 +119,7 @@ function extractSummary(item) {
 }
 
 // 解析RSS源内容
-function parseFeed(xml, name, site, config) {
+function parseFeed(xml, name, site, config, feedUrl) {
   return new Promise((resolve) => {
     parseString(xml, (err, result) => {
       if (err) {
@@ -121,6 +131,9 @@ function parseFeed(xml, name, site, config) {
       try {
         const entries = [];
         const timeLimit = Date.now() - config.daysLimit * 86400000;
+        
+        // 获取基础URL（优先从YAML配置中获取，其次从feed URL提取）
+        const baseUrl = site || extractBaseUrl(feedUrl) || extractBaseUrl(feedUrl);
         
         // 处理RSS 2.0格式
         if (result.rss?.channel) {
@@ -137,8 +150,8 @@ function parseFeed(xml, name, site, config) {
                 summary: extractSummary(item),
                 source: {
                   name,
-                  site,
-                  url: channel.link?.[0]?.trim() || site
+                  site: baseUrl, // 使用基础URL
+                  url: baseUrl   // 使用基础URL而不是具体页面
                 }
               });
             }
@@ -163,10 +176,8 @@ function parseFeed(xml, name, site, config) {
                 summary: extractSummary(item),
                 source: {
                   name,
-                  site,
-                  url: feed.link?.find(l => l.$.rel === 'alternate')?.$.href || 
-                       feed.link?.[0]?.$.href || 
-                       site
+                  site: baseUrl, // 使用基础URL
+                  url: baseUrl   // 使用基础URL而不是具体页面
                 }
               });
             }
