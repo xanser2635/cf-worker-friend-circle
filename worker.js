@@ -35,11 +35,10 @@ async function fetchFriendsData(config) {
 
 // 获取所有RSS源数据
 async function fetchAllFeeds(friendsData, config) {
-  // 修改点: 使用 feed 字段替代 rss
   const feedUrls = friendsData
-    .filter(friend => friend.feed) // 改为检查 feed 字段
+    .filter(friend => friend.feed)
     .map(friend => ({
-      url: friend.feed, // 改为使用 feed 字段
+      url: friend.feed,
       name: friend.name,
       site: friend.site
     }));
@@ -78,6 +77,37 @@ async function fetchFeed(url, name, site, config) {
   }
 }
 
+// 提取摘要内容
+function extractSummary(item) {
+  // 尝试获取带有 type="html" 的摘要
+  if (item.summary && Array.isArray(item.summary)) {
+    for (const summary of item.summary) {
+      if (summary.$ && summary.$.type === "html") {
+        return summary._ ? summary._.trim() : null;
+      }
+      return summary.trim();
+    }
+  }
+  
+  // 尝试获取普通摘要字段
+  if (item.summary && Array.isArray(item.summary)) {
+    return item.summary[0].trim();
+  }
+  
+  // 尝试获取描述字段
+  if (item.description && Array.isArray(item.description)) {
+    return item.description[0].trim();
+  }
+  
+  // 尝试获取内容字段
+  if (item.content && Array.isArray(item.content)) {
+    return item.content[0].trim();
+  }
+  
+  // 都没有则返回null
+  return null;
+}
+
 // 解析RSS源内容
 function parseFeed(xml, name, site, config) {
   return new Promise((resolve) => {
@@ -104,6 +134,7 @@ function parseFeed(xml, name, site, config) {
                 title: item.title?.[0]?.trim() || '无标题',
                 link: item.link?.[0]?.trim() || '#',
                 date: entryDate.toISOString(),
+                summary: extractSummary(item),
                 source: {
                   name,
                   site,
@@ -129,6 +160,7 @@ function parseFeed(xml, name, site, config) {
                 title: item.title?.[0]?._?.trim() || item.title?.[0]?.trim() || '无标题',
                 link,
                 date: entryDate.toISOString(),
+                summary: extractSummary(item),
                 source: {
                   name,
                   site,
