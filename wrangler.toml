@@ -8,3 +8,9 @@ enabled = true
 
 [vars]
 FRIENDS_YAML_URL = "https://blog.xanz.one/data/friends.yaml"
+# 以下为选填，根据需要来
+# CACHE_TTL = ""        建议自行拉大一点，提高请求速度
+# MAX_ENTRIES = ""
+# DAYS_LIMIT = ""
+# REQUEST_TIMEOUT = ""
+# SUMMARY_LIMIT = ""

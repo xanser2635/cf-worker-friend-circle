@@ -9,7 +9,7 @@ function getConfig(env) {
   const MAX_ENTRIES = env.MAX_ENTRIES;
   const DAYS_LIMIT = env.DAYS_LIMIT;
   const REQUEST_TIMEOUT = env.REQUEST_TIMEOUT;
-  const SUMMARY_LIMIT = env.SUMMARY_LIMIT; // 新增摘要长度限制配置
+  const SUMMARY_LIMIT = env.SUMMARY_LIMIT;
 
   if (!FRIENDS_YAML_URL) {
     throw new Error(`FRIENDS_YAML_URL 环境变量未配置`);
@@ -153,7 +153,7 @@ function parseFeed(xml, name, config) {
                 date: entryDate.toISOString(),
                 summary: summary,
                 source: {
-                  name: name // 只保留name字段
+                  name: name
                 }
               });
             }
