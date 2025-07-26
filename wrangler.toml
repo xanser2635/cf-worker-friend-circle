@@ -2,15 +2,25 @@ name = "cf-worker-friend-circle"
 main = "worker.js"
 compatibility_date = "2025-07-17"
 compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "npm install && npm run build"
+
+[build.upload]
 format = "modules"
-[observability.logs]
-enabled = true
+main = "./worker.js"
+
+[build.upload.rules]
+type = "ESModule"
+
+[dependencies]
+"yaml" = "^2.3"
+"fast-xml-parser" = "^4.2"
 
 [vars]
-FRIENDS_YAML_URL = "https://blog.xanz.one/data/friends.yaml"        # 替换为自己的
-# 以下为选填，根据需要来
-# CACHE_TTL = ""        建议自行拉大一点，提高请求速度
+FRIENDS_YAML_URL = "https://blog.xanz.one/data/friends.yaml"
+# CACHE_TTL = ""
 # MAX_ENTRIES = ""
-# DAYS_LIMIT = ""
+# DAYS_LIMIT = ""   
 # REQUEST_TIMEOUT = ""
-# SUMMARY_LIMIT = ""
+#SUMMARY_LIMIT = ""
