@@ -7,10 +7,10 @@ format = "modules"
 enabled = true
 
 [vars]
-FRIENDS_YAML_URL = "https://blog.xanz.one/data/friends.yaml"        # 替换为自己的
-# 以下为选填，根据需要来
-# CACHE_TTL = ""        建议自行拉大一点，提高请求速度
-# MAX_ENTRIES = ""
-# DAYS_LIMIT = ""
-# REQUEST_TIMEOUT = ""
-# SUMMARY_LIMIT = ""
+FRIENDS_YAML_URL = "https://blog.xanz.one/data/friends.yaml"
+BATCH_SIZE = "15"  # 新增批次大小配置，根据实际情况调整
+# CACHE_TTL = "1800"  # 建议设置较长的缓存时间
+# MAX_ENTRIES = "100"
+# DAYS_LIMIT = "14"
+# REQUEST_TIMEOUT = "15000"
+# SUMMARY_LIMIT = "120"

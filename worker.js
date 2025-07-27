@@ -10,6 +10,7 @@ function getConfig(env) {
   const DAYS_LIMIT = env.DAYS_LIMIT;
   const REQUEST_TIMEOUT = env.REQUEST_TIMEOUT;
   const SUMMARY_LIMIT = env.SUMMARY_LIMIT;
+  const BATCH_SIZE = env.BATCH_SIZE; // 新增批次大小配置
 
   if (!FRIENDS_YAML_URL) {
     throw new Error(`FRIENDS_YAML_URL 环境变量未配置`);
@@ -21,7 +22,8 @@ function getConfig(env) {
     limit: MAX_ENTRIES ? parseInt(MAX_ENTRIES) : 50,
     daysLimit: DAYS_LIMIT ? parseInt(DAYS_LIMIT) : 30,
     timeout: REQUEST_TIMEOUT ? parseInt(REQUEST_TIMEOUT) : 10000,
-    summaryLimit: SUMMARY_LIMIT ? parseInt(SUMMARY_LIMIT) : 100 // 默认100个字符
+    summaryLimit: SUMMARY_LIMIT ? parseInt(SUMMARY_LIMIT) : 100, // 默认100个字符
+    batchSize: BATCH_SIZE ? parseInt(BATCH_SIZE) : 10 // 默认每批10个友链
   };
 }
 
@@ -35,7 +37,7 @@ async function fetchFriendsData(config) {
   return parse(yamlText);
 }
 
-// 获取所有RSS源数据
+// 获取所有RSS源数据（增加分片处理）
 async function fetchAllFeeds(friendsData, config) {
   const feedUrls = friendsData
     .filter(friend => friend.feed)
@@ -43,14 +45,36 @@ async function fetchAllFeeds(friendsData, config) {
       url: friend.feed,
       name: friend.name
     }));
-  
-  const results = await Promise.allSettled(
-    feedUrls.map(item => fetchFeed(item.url, item.name, config))
-  );
-  
-  return results.flatMap(result => 
-    result.status === 'fulfilled' ? result.value : []
-  );
+
+  // 分片处理逻辑
+  const batchSize = config.batchSize;
+  const batches = Math.ceil(feedUrls.length / batchSize);
+  let allResults = [];
+
+  for (let i = 0; i < batches; i++) {
+    const start = i * batchSize;
+    const end = start + batchSize;
+    const batch = feedUrls.slice(start, end);
+
+    // 使用Promise.allSettled处理当前批次
+    const batchResults = await Promise.allSettled(
+      batch.map(item => fetchFeed(item.url, item.name, config))
+    );
+
+    // 收集当前批次的结果
+    const batchData = batchResults.flatMap(result => 
+      result.status === 'fulfilled' ? result.value : []
+    );
+    
+    allResults = allResults.concat(batchData);
+    
+    // 每批处理完成后等待1秒，避免触发限流
+    if (i < batches - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  return allResults;
 }
 
 // 处理摘要截断
